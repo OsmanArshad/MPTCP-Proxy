@@ -13,7 +13,9 @@ class ConnectionHandler:
         self.client = connection
         self.client_buffer = ''
         self.timeout = timeout
-        
+        self.final_msg = ''
+        self.more_to_come = True
+
         #print the request and it extracts the protocol and path
         self.method, self.path, self.protocol = self.get_base_header()
         
@@ -76,9 +78,12 @@ class ConnectionHandler:
         print contentLength
 
         # Sending the actual request to the server
-        requestHeaders = 'Range: bytes=0-600\n' + self.client_buffer
-        self.target.send('%s %s %s\r\n%s'%(self.method, path, self.protocol, requestHeaders))
-        print '%s %s %s \r\n%s'%(self.method, path, self.protocol, requestHeaders)
+        requestHeaders1 = 'Range: bytes=0-600\n' + self.client_buffer
+        requestHeaders2 = 'Range: bytes=601-1200\n' + self.client_buffer
+        self.target.send('%s %s %s\r\n%s'%(self.method, path, self.protocol, requestHeaders1))
+        #self._read_write()
+        self.target.send('%s %s %s\r\n%s'%(self.method, path, self.protocol, requestHeaders2))
+        
         self.client_buffer = ''
 
         self._read_write()
@@ -113,10 +118,10 @@ class ConnectionHandler:
                         out = self.client
                     if data:
                         #TO DO: Check if it's response to the RANGE request and extract the Content-Length
-
+                        self.final_msg += data
                         #TO DO: merge the data from both interfaces into one big data, if we are receiving
 
-                        out.send(data)
+                        out.send(self.final_msg)
                         count = 0
             if count == time_out_max:
                 break
