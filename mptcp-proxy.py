@@ -76,8 +76,9 @@ class ConnectionHandler:
         print contentLength
 
         # Sending the actual request to the server
-        self.target.send('%s %s %s\r\n%s'%(self.method, path, self.protocol, self.client_buffer))
-        #TO DO: need to send another request to "target2" that GETs a different range of bytes
+        requestHeaders = 'Range: bytes=0-600\n' + self.client_buffer
+        self.target.send('%s %s %s\r\n%s'%(self.method, path, self.protocol, requestHeaders))
+        print '%s %s %s \r\n%s'%(self.method, path, self.protocol, requestHeaders)
         self.client_buffer = ''
 
         self._read_write()
