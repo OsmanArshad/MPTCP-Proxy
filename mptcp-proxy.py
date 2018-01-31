@@ -13,10 +13,8 @@ class ConnectionHandler:
         self.timeout = timeout
 
         self.content_length = ''
-        self.content_range = ''
         self.final_msg = ''
-        self.final_msg2 = ''
-        self.msg_list = []
+        self.final_msg_complete = False
 
         #print the request and it extracts the protocol and path
         self.method, self.path, self.protocol = self.get_base_header()
@@ -49,8 +47,7 @@ class ConnectionHandler:
     def method_CONNECT(self):
         print('connect!')
         self._connect_target(self.path)
-        self.client.send(HTTPVER+' 200 Connection established\n'+
-                         'Proxy-agent: %s\n\n'%VERSION)
+        self.client.send(HTTPVER+' 200 Connection established\n'+'Proxy-agent: %s\n\n'%VERSION)
         self.client_buffer = ''
         self._read_write()        
 
@@ -69,6 +66,7 @@ class ConnectionHandler:
             
             contentLengthPos = headReqMsg.find('Content-Length: ') + 16
             x = contentLengthPos
+            n = ""
             while 1:
                 if headReqMsg[x].isspace():
                     break
@@ -76,20 +74,23 @@ class ConnectionHandler:
                     self.content_length += headReqMsg[x] 
                     x += 1
 
-            # Sending the actual request to the server
-            requestHeaders1 = 'Range: bytes=0-600\n' + self.client_buffer
-            requestHeaders2 = 'Range: bytes=601-1200\n' + self.client_buffer
-            
-            self.client_buffer = ''
-            self.final_msg = ''
+            # Creating the ranges for the two partial GET request
+            dataHalf = int(self.content_length) / 2
+            firstRange  = str(dataHalf)
+            secondRange = str(dataHalf+1)
 
-            #self.target.send('%s %s %s\n%s'%(self.method, path, self.protocol, self.client_buffer))
+            requestHeaders1 = 'Range: bytes=0-' + firstRange + '\n' + self.client_buffer
+            requestHeaders2 = 'Range: bytes='+ secondRange + '-' + self.content_length + '\n' + self.client_buffer
+
             self.target.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders1))
             self.target.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders2))
 
+            self.client_buffer = ''
+            self.final_msg = ''
+
             self._read_write()
 
-            print '\n\n\nTHIS IS SELFFINALMSG'
+            print '\n\n\nTHIS IS SELFFINALMSG\n\n'
             print self.final_msg
 
             self.client.send(self.final_msg)
