@@ -29,18 +29,18 @@ class ConnectionHandler:
         self.target.close()
 
     def get_base_header(self):
+        # read in the message the client is sending
         while 1:
-            self.client_buffer += self.client.recv(BUFLEN)  # receives data from client continuously
-            end = self.client_buffer.find('\n')             # when you reach new line symbol, stop reading input
+            self.client_buffer += self.client.recv(BUFLEN)
+            end = self.client_buffer.find('\n')
             if end!=-1:
                 break
 
-        #print the request
-        print '%s'%self.client_buffer[:end]#debug
-
-        data = (self.client_buffer[:end+1]).split()         # split the received message by spaces and store as a list into data variable
+        # split the received message by spaces and create a list containing
+        # the method, path, and protocol of the client's request
+        data = (self.client_buffer[:end+1]).split()
         self.client_buffer = self.client_buffer[end+1:]
-        return data                                         # data variable is a python list that also holds method, path, protocol
+        return data
 
     def method_CONNECT(self):
         print('connect!')
@@ -58,9 +58,8 @@ class ConnectionHandler:
         path = self.path[i:]
         self._connect_target(host)
 
-        #TO DO: first find out the Content-Length by sending a RANGE request
-        self.target.send('%s %s %s\r\n%s'%("HEAD", path, self.protocol,
-                         self.client_buffer))
+        # Sending head request to get the content length of the requested site
+        self.target.send('%s %s %s\r\n%s'%("HEAD", path, self.protocol,self.client_buffer))
         headReqMsg = self.target.recv(4096)
         contentLengthPos = headReqMsg.find('Content-Length: ')
 
@@ -75,14 +74,12 @@ class ConnectionHandler:
                 x += 1
                 
         print contentLength
-        #print('%s %s %s\r\n%s'%(self.method, path, self.protocol,
-                         #self.client_buffer))
-        self.target.send('%s %s %s\r\n%s'%(self.method, path, self.protocol,
-                         self.client_buffer))
+
+        # Sending the actual request to the server
+        self.target.send('%s %s %s\r\n%s'%(self.method, path, self.protocol, self.client_buffer))
         #TO DO: need to send another request to "target2" that GETs a different range of bytes
         self.client_buffer = ''
 
-        #start the read/write function
         self._read_write()
 
     def _connect_target(self, host):        # makes a connection the host variable that is passed in
