@@ -14,6 +14,8 @@ class ConnectionHandler:
 
         self.content_length = ''
         self.final_msg = ''
+        self.final_msg_list = []
+        self.final_msg_list_temp = []
         self.final_msg_complete = False
 
         #print the request and it extracts the protocol and path
@@ -82,18 +84,22 @@ class ConnectionHandler:
             requestHeaders1 = 'Range: bytes=0-' + firstRange + '\n' + self.client_buffer
             requestHeaders2 = 'Range: bytes='+ secondRange + '-' + self.content_length + '\n' + self.client_buffer
 
-            self.target.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders1))
-            self.target.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders2))
+            self.target2.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders1))
+            self.target2.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders2))
 
             self.client_buffer = ''
             self.final_msg = ''
 
             self._read_write()
 
-            print '\n\n\nTHIS IS SELFFINALMSG\n\n'
-            print self.final_msg
+            #print '\n\n\nTHIS IS SELFFINALMSG\n\n'
+            #print self.final_msg
 
-            self.client.send(self.final_msg)
+            self.content_length = ''
+            self.final_msg = ''
+            self.final_msg_list = []
+            self.final_msg_list_temp = []
+            self.final_msg_complete = False
     
         #else:
         #    self.target.send('%s %s %s\n'%(self.method, path, self.protocol)+self.client_buffer)
@@ -132,7 +138,7 @@ class ConnectionHandler:
                 for in_ in recv:
                     data = in_.recv(BUFLEN)
                     if in_ is self.client:
-                        out = self.target
+                        out = self.target2
                     else:
                         out = self.client
                     if data:
@@ -147,7 +153,7 @@ class ConnectionHandler:
                                     contentRange += data[x] 
                                     x += 1
                             
-                            # This is to format HTTP headers for the first partial GET request
+                            # This is to format HTTP headers from the first partial GET request
                             # The data associated with the request may possibly come thru here
                             if contentRange[0] == '0':
                                 splitData = data.splitlines()
@@ -171,11 +177,12 @@ class ConnectionHandler:
                                 contRngHeaderPos = contRngHeaderSearch[0]
                                 del httpHeaders[contRngHeaderPos]
 
-                                httpHeadersFixed = '\n'.join(httpHeaders)
+                                httpHeadersFixed = '\n'.join(httpHeaders) + '\n'
 
-                                self.final_msg += httpHeadersFixed
-                                self.final_msg += '\n'
-                                self.final_msg += attachedData
+                                self.final_msg_list.append(httpHeadersFixed)
+
+                                if len(attachedData) > 15:
+                                    self.final_msg_list.append(attachedData)
 
                             # Headers for 2nd partial GET request are removed from data here
                             else:
@@ -183,13 +190,29 @@ class ConnectionHandler:
                                 lastHeaderPos2 = splitData2.index('') + 1
                                 attachedData2 = '\n'.join(splitData2[lastHeaderPos2:])
 
-                                self.final_msg += attachedData2
+                                if len(self.final_msg_list) == 2:
+                                    if len(attachedData2) > 15:
+                                        self.final_msg_list.append(attachedData2)
+                                        self.final_msg_complete = True
+                                else:
+                                    self.final_msg_list_temp.append(attachedData2)
 
                         # Received data comes here when there are no HTTP headers associated
                         else:
-                            self.final_msg += data
-                        
+                            if len(self.final_msg_list) == 2:
+                                self.final_msg_list.append(data)
+                                self.final_msg_complete = True
+
+                            if len(self.final_msg_list) == 1:
+                                self.final_msg_list.append(data)
+
                         count = 0
+
+                    if self.final_msg_complete:
+                        for msg in self.final_msg_list:
+                            self.final_msg += msg
+                        self.client.send(self.final_msg)    
+                        
             if count == time_out_max:
                 break
 
