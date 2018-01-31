@@ -1,7 +1,7 @@
 # -*- coding: cp1252 -*-
 # <PythonProxy.py>
 # curl -x localhost:8080 http://www.cs.ucr.edu/~eamonn/cs170/
-import socket, thread, select
+import socket, thread, select, httplib
 
 __version__ = '0.1.0 Draft 1'
 BUFLEN = 8192
@@ -16,8 +16,6 @@ class ConnectionHandler:
         
         #print the request and it extracts the protocol and path
         self.method, self.path, self.protocol = self.get_base_header()
-        
-        print('what are you running?')
         
         if self.method=='CONNECT':
             self.method_CONNECT()
@@ -61,12 +59,27 @@ class ConnectionHandler:
         self._connect_target(host)
 
         #TO DO: first find out the Content-Length by sending a RANGE request
-        print('here')
+        self.target.send('%s %s %s\r\n%s'%("HEAD", path, self.protocol,
+                         self.client_buffer))
+        headReqMsg = self.target.recv(4096)
+        contentLengthPos = headReqMsg.find('Content-Length: ')
+
+        contentLengthValPos = contentLengthPos + 16
+        contentLength = ''
+        x = contentLengthValPos
+        while 1:
+            if headReqMsg[x].isspace():
+                break
+            else:
+                contentLength += headReqMsg[x] 
+                x += 1
+                
+        print contentLength
+        #print('%s %s %s\r\n%s'%(self.method, path, self.protocol,
+                         #self.client_buffer))
         self.target.send('%s %s %s\r\n%s'%(self.method, path, self.protocol,
                          self.client_buffer))
         #TO DO: need to send another request to "target2" that GETs a different range of bytes
-        print('%s %s %s\r\n%s'%(self.method, path, self.protocol,
-                         self.client_buffer))
         self.client_buffer = ''
 
         #start the read/write function
