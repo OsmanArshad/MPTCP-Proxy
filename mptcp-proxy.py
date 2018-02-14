@@ -1,6 +1,4 @@
-# -*- coding: cp1252 -*-
-# <PythonProxy.py>
-# curl -x localhost:8080 http://www.cs.ucr.edu/~eamonn/cs170/
+# <mptcp-proxy.py>
 import socket, thread, select, httplib
 
 __version__ = '0.1.0 Draft 1'
