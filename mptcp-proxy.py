@@ -15,6 +15,7 @@ class ConnectionHandler:
         self.content_length = ''
         self.content_range = ''
         self.final_msg = ''
+        self.final_msg2 = ''
         self.msg_list = []
 
         #print the request and it extracts the protocol and path
@@ -82,18 +83,22 @@ class ConnectionHandler:
             requestHeaders2 = 'Range: bytes=601-1200\n' + self.client_buffer
             
             self.client_buffer = ''
+            self.final_msg = ''
+
             #self.target.send('%s %s %s\n%s'%(self.method, path, self.protocol, self.client_buffer))
             self.target.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders1))
             self.target.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders2))
 
-            self.final_msg = ''
-            self.client_buffer = ''
+            
 
             print 'READWRITE HERE'
             self._read_write()
 
             print '\n\n\nTHIS IS SELFFINALMSG'
             print self.final_msg
+
+            print '\n\n\nTHIS IS SELFFINALMSG2'
+            print self.final_msg2
 
             self.client.send(self.final_msg)
 
@@ -142,8 +147,6 @@ class ConnectionHandler:
                         out = self.client
                     if data:
                         if 'Partial Content' in data:
-                            print 'PARTIAL GET REQ MSG'
-                            print data
                             contentRangePos = data.find('Content-Range: bytes ') + 21
                             
                             contentRange = ''
@@ -156,17 +159,19 @@ class ConnectionHandler:
                                     x += 1
                             
                             if contentRange[0] == '0':
-                                print 'first range'
-                                self.final_msg += data
-
-                            else:
                                 splitData = data.splitlines()
                                 lastHeaderLoc = splitData.index('') + 1
-                                test = ' '.join(splitData[lastHeaderLoc:])
+                                test = '\n'.join(splitData[lastHeaderLoc:])
                                 self.final_msg += test
 
+                            else:
+                                splitData2 = data.splitlines()
+                                lastHeaderLoc2 = splitData2.index('') + 1
+                                test2 = '\n'.join(splitData2[lastHeaderLoc2:])
+                                self.final_msg += test2
+
                         else:
-                            self.final_msg += data
+                            self.final_msg2 += data
                             print 'THIS IS DATA'
                             print data
                         
