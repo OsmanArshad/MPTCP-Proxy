@@ -11,8 +11,11 @@ class ConnectionHandler:
         self.client = connection
         self.client_buffer = ''
         self.timeout = timeout
+
+        self.content_length = ''
+        self.content_range = ''
         self.final_msg = ''
-        self.more_to_come = True
+        self.msg_list = []
 
         #print the request and it extracts the protocol and path
         self.method, self.path, self.protocol = self.get_base_header()
@@ -58,33 +61,52 @@ class ConnectionHandler:
         path = self.path[i:]
         self._connect_target(host)
 
-        # Sending head request to get the content length of the requested site
-        self.target.send('%s %s %s\r\n%s'%("HEAD", path, self.protocol,self.client_buffer))
-        headReqMsg = self.target.recv(4096)
-        contentLengthPos = headReqMsg.find('Content-Length: ')
+        if self.method == 'GET':
+            # Sending head request to get the content length of the requested site
+            self.target.send('%s %s %s\r\n%s'%("HEAD", path, self.protocol, self.client_buffer))
+            headReqMsg = self.target.recv(4096)
+            
+            contentLengthPos = headReqMsg.find('Content-Length: ') + 16
+            x = contentLengthPos
+            while 1:
+                if headReqMsg[x].isspace():
+                    break
+                else:
+                    self.content_length += headReqMsg[x] 
+                    x += 1
+                    
+            print self.content_length
 
-        contentLengthValPos = contentLengthPos + 16
-        contentLength = ''
-        x = contentLengthValPos
-        while 1:
-            if headReqMsg[x].isspace():
-                break
-            else:
-                contentLength += headReqMsg[x] 
-                x += 1
-                
-        print contentLength
+            # Sending the actual request to the server
+            requestHeaders1 = 'Range: bytes=0-600\n' + self.client_buffer
+            requestHeaders2 = 'Range: bytes=601-1200\n' + self.client_buffer
+            
+            self.client_buffer = ''
+            #self.target.send('%s %s %s\n%s'%(self.method, path, self.protocol, self.client_buffer))
+            self.target.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders1))
+            self.target.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders2))
 
-        # Sending the actual request to the server
-        requestHeaders1 = 'Range: bytes=0-600\n' + self.client_buffer
-        requestHeaders2 = 'Range: bytes=601-1200\n' + self.client_buffer
-        self.target.send('%s %s %s\r\n%s'%(self.method, path, self.protocol, requestHeaders1))
-        #self._read_write()
-        self.target.send('%s %s %s\r\n%s'%(self.method, path, self.protocol, requestHeaders2))
+            self.final_msg = ''
+            self.client_buffer = ''
+
+            print 'READWRITE HERE'
+            self._read_write()
+
+            print '\n\n\nTHIS IS SELFFINALMSG'
+            print self.final_msg
+
+            self.client.send(self.final_msg)
+
+            #self.target2.send('%s %s %s\r\n%s'%(self.method, path, self.protocol, requestHeaders2))
+            #self.client_buffer = ''
+            #self._read_write()
         
-        self.client_buffer = ''
-
-        self._read_write()
+        #else:
+        #    self.target.send('%s %s %s\n'%(self.method, path, self.protocol)+self.client_buffer)
+        #    #TO DO: need to send another request to "target2" that GETs a different range of bytes
+        #    self.client_buffer = ''
+            #start the read/write function
+        #    self._read_write()
 
     def _connect_target(self, host):        # makes a connection the host variable that is passed in
         i = host.find(':')
@@ -97,10 +119,14 @@ class ConnectionHandler:
         self.target = socket.socket(soc_family)
         self.target.connect(address)
 
+        (soc_family, _, _, _, address) = socket.getaddrinfo(host, port)[0]
+        self.target2 = socket.socket(soc_family)
+        self.target2.connect(address)
+
     #"revolving door" to re-direct the packets in the right direction
     def _read_write(self):
         time_out_max = self.timeout/3
-        socs = [self.client, self.target]
+        socs = [self.client, self.target, self.target2]
         count = 0
         while 1:
             count += 1
@@ -115,18 +141,41 @@ class ConnectionHandler:
                     else:
                         out = self.client
                     if data:
-                        #TO DO: Check if it's response to the RANGE request and extract the Content-Length
-                        self.final_msg += data
-                        #TO DO: merge the data from both interfaces into one big data, if we are receiving
+                        if 'Partial Content' in data:
+                            print 'PARTIAL GET REQ MSG'
+                            print data
+                            contentRangePos = data.find('Content-Range: bytes ') + 21
+                            
+                            contentRange = ''
+                            x = contentRangePos
+                            while 1:
+                                if data[x] == '/':
+                                    break
+                                else:
+                                    contentRange += data[x] 
+                                    x += 1
+                            
+                            if contentRange[0] == '0':
+                                print 'first range'
+                                self.final_msg += data
 
-                        out.send(self.final_msg)
+                            else:
+                                splitData = data.splitlines()
+                                lastHeaderLoc = splitData.index('') + 1
+                                test = ' '.join(splitData[lastHeaderLoc:])
+                                self.final_msg += test
+
+                        else:
+                            self.final_msg += data
+                            print 'THIS IS DATA'
+                            print data
+                        
                         count = 0
             if count == time_out_max:
                 break
 
 #start the proxy server and listen for connections on port 8080
-def start_server(host='localhost', port=8080, IPv6=False, timeout=60,
-                  handler=ConnectionHandler):
+def start_server(host='localhost', port=8080, IPv6=False, timeout=60, handler=ConnectionHandler):
     if IPv6==True:
         soc_type=socket.AF_INET6
     else:
