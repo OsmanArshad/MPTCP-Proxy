@@ -75,8 +75,6 @@ class ConnectionHandler:
                 else:
                     self.content_length += headReqMsg[x] 
                     x += 1
-                    
-            print self.content_length
 
             # Sending the actual request to the server
             requestHeaders1 = 'Range: bytes=0-600\n' + self.client_buffer
@@ -89,23 +87,13 @@ class ConnectionHandler:
             self.target.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders1))
             self.target.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders2))
 
-            
-
-            print 'READWRITE HERE'
             self._read_write()
 
             print '\n\n\nTHIS IS SELFFINALMSG'
             print self.final_msg
 
-            print '\n\n\nTHIS IS SELFFINALMSG2'
-            print self.final_msg2
-
             self.client.send(self.final_msg)
-
-            #self.target2.send('%s %s %s\r\n%s'%(self.method, path, self.protocol, requestHeaders2))
-            #self.client_buffer = ''
-            #self._read_write()
-        
+    
         #else:
         #    self.target.send('%s %s %s\n'%(self.method, path, self.protocol)+self.client_buffer)
         #    #TO DO: need to send another request to "target2" that GETs a different range of bytes
@@ -113,7 +101,8 @@ class ConnectionHandler:
             #start the read/write function
         #    self._read_write()
 
-    def _connect_target(self, host):        # makes a connection the host variable that is passed in
+    # makes a connection the host variable that is passed in
+    def _connect_target(self, host): 
         i = host.find(':')
         if i!=-1:
             port = int(host[i+1:])
@@ -148,7 +137,6 @@ class ConnectionHandler:
                     if data:
                         if 'Partial Content' in data:
                             contentRangePos = data.find('Content-Range: bytes ') + 21
-                            
                             contentRange = ''
                             x = contentRangePos
                             while 1:
@@ -158,22 +146,47 @@ class ConnectionHandler:
                                     contentRange += data[x] 
                                     x += 1
                             
+                            # This is to format HTTP headers for the first partial GET request
+                            # The data associated with the request may possibly come thru here
                             if contentRange[0] == '0':
                                 splitData = data.splitlines()
-                                lastHeaderLoc = splitData.index('') + 1
-                                test = '\n'.join(splitData[lastHeaderLoc:])
-                                self.final_msg += test
+                                lastHeaderPos = splitData.index('') + 1
 
+                                httpHeaders = splitData[:lastHeaderPos]
+                                attachedData = '\n'.join(splitData[lastHeaderPos:])
+
+                                # Change HTTP message to 200 OK from 206 Partial Content
+                                httpMsgTypePos = httpHeaders[0].find('206')
+                                httpOkMsg = httpHeaders[0][0:httpMsgTypePos] + '200 OK'
+                                httpHeaders[0] = httpOkMsg
+
+                                # Replace Content Length value from a partial to full length
+                                contLenHeaderSearch = [i for i, s in enumerate(httpHeaders) if 'Content-Length:' in s]
+                                contLenHeaderPos = contLenHeaderSearch[0]
+                                httpHeaders[contLenHeaderPos] = 'Content-Length: ' + self.content_length
+
+                                # Delete Content Range header
+                                contRngHeaderSearch = [i for i, s in enumerate(httpHeaders) if 'Content-Range:' in s]
+                                contRngHeaderPos = contRngHeaderSearch[0]
+                                del httpHeaders[contRngHeaderPos]
+
+                                httpHeadersFixed = '\n'.join(httpHeaders)
+
+                                self.final_msg += httpHeadersFixed
+                                self.final_msg += '\n'
+                                self.final_msg += attachedData
+
+                            # Headers for 2nd partial GET request are removed from data here
                             else:
                                 splitData2 = data.splitlines()
-                                lastHeaderLoc2 = splitData2.index('') + 1
-                                test2 = '\n'.join(splitData2[lastHeaderLoc2:])
-                                self.final_msg += test2
+                                lastHeaderPos2 = splitData2.index('') + 1
+                                attachedData2 = '\n'.join(splitData2[lastHeaderPos2:])
 
+                                self.final_msg += attachedData2
+
+                        # Received data comes here when there are no HTTP headers associated
                         else:
-                            self.final_msg2 += data
-                            print 'THIS IS DATA'
-                            print data
+                            self.final_msg += data
                         
                         count = 0
             if count == time_out_max:
