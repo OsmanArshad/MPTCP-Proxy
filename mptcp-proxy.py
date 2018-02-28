@@ -84,8 +84,8 @@ class ConnectionHandler:
             requestHeaders1 = 'Range: bytes=0-' + firstRange + '\n' + self.client_buffer
             requestHeaders2 = 'Range: bytes='+ secondRange + '-' + self.content_length + '\n' + self.client_buffer
 
-            self.target2.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders1))
-            self.target2.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders2))
+            self.target.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders1))
+            self.target.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders2))
 
             self.client_buffer = ''
             self.final_msg = ''
@@ -116,6 +116,7 @@ class ConnectionHandler:
             host = host[:i]
         else:
             port = 80
+
         (soc_family, _, _, _, address) = socket.getaddrinfo(host, port)[0]
         self.target = socket.socket(soc_family)
         self.target.connect(address)
@@ -138,7 +139,7 @@ class ConnectionHandler:
                 for in_ in recv:
                     data = in_.recv(BUFLEN)
                     if in_ is self.client:
-                        out = self.target2
+                        out = self.target
                     else:
                         out = self.client
                     if data:
@@ -206,12 +207,12 @@ class ConnectionHandler:
                             if len(self.final_msg_list) == 1:
                                 self.final_msg_list.append(data)
 
-                        count = 0
+                        if self.final_msg_complete:
+                            for msg in self.final_msg_list:
+                                self.final_msg += msg
+                            self.client.send(self.final_msg)
 
-                    if self.final_msg_complete:
-                        for msg in self.final_msg_list:
-                            self.final_msg += msg
-                        self.client.send(self.final_msg)    
+                        count = 0
                         
             if count == time_out_max:
                 break
