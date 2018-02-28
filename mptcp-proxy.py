@@ -85,15 +85,15 @@ class ConnectionHandler:
             requestHeaders2 = 'Range: bytes='+ secondRange + '-' + self.content_length + '\n' + self.client_buffer
 
             self.target.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders1))
-            self.target.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders2))
+            self.target2.send('%s %s %s\n%s'%(self.method, path, self.protocol, requestHeaders2))
 
             self.client_buffer = ''
             self.final_msg = ''
 
             self._read_write()
 
-            #print '\n\n\nTHIS IS SELFFINALMSG\n\n'
-            #print self.final_msg
+            print 'Number of times the data came with the headers'
+            print self.bungabunga
 
             self.content_length = ''
             self.final_msg = ''
@@ -119,10 +119,12 @@ class ConnectionHandler:
 
         (soc_family, _, _, _, address) = socket.getaddrinfo(host, port)[0]
         self.target = socket.socket(soc_family)
+        # self.target.bind(ethernet IP, 0)
         self.target.connect(address)
 
         (soc_family, _, _, _, address) = socket.getaddrinfo(host, port)[0]
         self.target2 = socket.socket(soc_family)
+        # self.target2.bind(ethernet IP, 0)
         self.target2.connect(address)
 
     #"revolving door" to re-direct the packets in the right direction
@@ -130,6 +132,7 @@ class ConnectionHandler:
         time_out_max = self.timeout/3
         socs = [self.client, self.target, self.target2]
         count = 0
+        self.bungabunga = 0
         while 1:
             count += 1
             (recv, _, error) = select.select(socs, [], socs, 3)
@@ -139,13 +142,15 @@ class ConnectionHandler:
                 for in_ in recv:
                     data = in_.recv(BUFLEN)
                     if in_ is self.client:
-                        print 'IN_'
-                        print in_
                         out = self.target
                     else:
                         out = self.client
                     if data:
+                        print '--------- RECEIVED DATA STARTS HERE ---------'
+                        print data
+                        print '--------- RECEIVED DATA ENDS HERE ---------'
                         if 'Partial Content' in data:
+                            self.bungabunga += 1
                             contentRangePos = data.find('Content-Range: bytes ') + 21
                             contentRange = ''
                             x = contentRangePos
@@ -155,6 +160,9 @@ class ConnectionHandler:
                                 else:
                                     contentRange += data[x] 
                                     x += 1
+                            
+                            print '--------- CONTENT RANGE STARTS HERE ---------'
+                            print contentRange
                             
                             # This is to format HTTP headers from the first partial GET request
                             # The data associated with the request may possibly come thru here
