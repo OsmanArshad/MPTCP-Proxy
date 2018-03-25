@@ -114,7 +114,6 @@ class ConnectionHandler:
             self.client_buffer = ''
             self.final_msg = ''
 
-            #print '\n\n_________________________________START___________________________________________'
             self._read_write()
             end = time.time()
             print 'TIME'
@@ -177,14 +176,9 @@ class ConnectionHandler:
                     else:
                         out = self.client
                     if data:
-                        #print '--------->>>>>>DATA ARRIVED ON ' + currently_using
-                        #print data
-
                         # Received data comes here when there are no HTTP headers associated
                         if currently_using == 'target' and self.haveTargetHeaders == True:
-                            self.data_recvd_on_target += data 
-                            #print 'LENGTH OF LATE DATA IS::: ' + str(len(data))
-                            #print 'TARGET CONTENT SIZE WANTED IS::::::::: ' + str(self.content_size_on_target)                            
+                            self.data_recvd_on_target += data                 
                             if self.content_size_on_target == len(data):
                                 self.all_target_data_rcvd = True
                             else:
@@ -192,8 +186,6 @@ class ConnectionHandler:
                         
                         if currently_using == 'target2' and self.haveTarget2Headers == True:
                             self.data_recvd_on_target2 += data
-                            #print 'LENGTH OF LATE DATA IS::: ' + str(len(data))
-                            #print 'TARGET2 CONTENT SIZE WANTED IS::::::::: ' + str(self.content_size_on_target2)  
                             if self.content_size_on_target2 == len(data):
                                 self.all_target2_data_rcvd = True
                             else:
@@ -202,9 +194,7 @@ class ConnectionHandler:
 
                         if currently_using == 'target' and self.haveTargetHeaders == False:
                             self.targetFullHeaders += data
-                            #print 'DONT HAVE TARGET HEADERS YET'
                             if self.targetFullHeaders.find('\r\n\r\n') != -1:
-                                #print 'GOT TARGET HEADERS YET'
                                 self.haveTargetHeaders = True
 
                                 # First the content range of this data is extracted from headers
@@ -274,24 +264,18 @@ class ConnectionHandler:
                                 contentData = ''
                                 # Here we extract data that came attached to the headers
                                 if dataIncluded:
-                                    #print 'SO THE DATA CAME WITH THE HEADERS ON ' + currently_using
                                     contentData = self.targetFullHeaders[endOfHeadersPos:]
 
                                     self.data_recvd_on_target += contentData
-                                    #print 'LENGTH OF DATA ON HEADERS IS::: ' + str(len(contentData))
-                                    #print 'TARGET CONTENT SIZE WANTED IS::::::::: ' + str(self.content_size_on_target)
                                     if self.content_size_on_target == len(contentData):
                                         self.all_target_data_rcvd = True
                                     else:
                                         self.content_size_on_target = self.content_size_on_target - len(contentData)
-                                        #print 'WE ARE EXPECTING THIS MUCH DATA FOR TARGET ' + str(self.content_size_on_target)
 
 
                         if currently_using == 'target2' and self.haveTarget2Headers == False:
-                            #print 'DONT HAVE TARGET2 HEADERS YET'
                             self.target2FullHeaders += data
                             if self.target2FullHeaders.find('\r\n\r\n') != -1:
-                                #print 'GOT ALL TARGET 2 HEADERS'
                                 self.haveTarget2Headers = True
 
                                 # First the content range of this data is extracted from headers
@@ -335,26 +319,19 @@ class ConnectionHandler:
                                 contentData = ''
                                 # Here we extract data that came attached to the headers
                                 if dataIncluded:
-                                    #print 'SO THE DATA CAME WITH THE HEADERS ON ' + currently_using
                                     contentData = self.target2FullHeaders[endOfHeadersPos:]
 
                                     self.data_recvd_on_target2 += contentData
-                                    #print 'LENGTH OF DATA ON HEADERS IS::: ' + str(len(contentData))
-                                    #print 'TARGET2 CONTENT SIZE WANTED IS::::::::: ' + str(self.content_size_on_target2)  
                                     if self.content_size_on_target2 == len(contentData):
                                         self.all_target2_data_rcvd = True
                                     else:
                                         self.content_size_on_target2 = self.content_size_on_target2 - len(contentData)
-                                        #print 'WE ARE EXPECTING THIS MUCH DATA FOR TARGET ' + str(self.content_size_on_target)
 
                         if self.all_target_data_rcvd and self.all_target2_data_rcvd:
                             dataLength = len(self.data_recvd_on_target) + len(self.data_recvd_on_target2)
                             self.final_msg += self.data_recvd_on_target
                             self.final_msg += self.data_recvd_on_target2
                             self.client.send(self.final_msg)
-                            #print 'DATA LENGTH'
-                            #print dataLength
-                            #print '!!!!!!!!!!!!SENT!!!!!!!!!!!!!'
                             break
 
                         count = 0
